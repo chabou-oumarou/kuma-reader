@@ -1,123 +1,131 @@
 import streamlit as st
 import pandas as pd
 
-# --- APP CONFIG ---
-st.set_page_config(page_title="Kuma Method Lexicon", layout="wide")
+# --- APP CONFIGURATION ---
+st.set_page_config(page_title="Kuma Lexicon Web App", layout="wide", initial_sidebar_state="expanded")
 
-# --- KUMA METHOD LOGIC ENGINE ---
-# According to Mbock, sounds have inherent meanings. 
-# This helper simulates the "Kuma breakdown" for any word based on its consonants.
-KUMA_VIBRATIONS = {
-    "N": "Emergence, Primordial Water (Nun), Transmission of Life force.",
-    "R": "The Word (Ra), Opening, Solar Vibration, Radiation.",
-    "K": "Energy of Cohesion, Spirit/Double (Ka), The container.",
-    "M": "Transition, Transformation, The Mother/Origin (Mut).",
-    "B": "Incarnation, The Soul (Ba), Movement of the Spirit.",
-    "H": "Breath, Spirit, Invisible force.",
-    "S": "Causality, Direction, Flow of time."
+# --- KUMA METHOD PHILOSOPHY DATA ---
+# Rooted in Mbock's "Principes fondamentaux de la méthode Kuma"
+KUMA_ROOTS = {
+    "N": {"vibe": "Emergence / L'Eau Primordiale (Nun)", "logic": "Principe de transmission et de mouvement continu."},
+    "R": {"vibe": "Le Verbe Créateur / Rayonnement", "logic": "Ouverture de la conscience et vibration solaire (Ra)."},
+    "K": {"vibe": "Cohésion / L'Esprit (Ka)", "logic": "Principe de densification de l'énergie dans la forme."},
+    "M": {"vibe": "Transformation / Matrice (Mut)", "logic": "Passage de l'invisible au visible; le milieu."},
+    "B": {"vibe": "Incarnation / L'Âme (Ba)", "logic": "Déplacement de la force vitale dans le réceptacle."},
+    "S": {"vibe": "Causalité / Fluidité", "logic": "Le principe qui ordonne le chaos en flux."},
+    "H": {"vibe": "Souffle / Vie (Heh)", "logic": "L'élément impalpable qui anime la structure."},
+    "X": {"vibe": "Friction / Chaleur", "logic": "Le point de contact entre deux forces opposées."}
 }
 
-# --- EXTENDED DATABASE ---
-# In a production environment, this would be a CSV with 5,000+ rows.
-# Includes Vygus/Faulkner data but prioritized through a Kuma lens.
-MASTER_DICTIONARY = [
-    {"glyph": "𓈖", "mdc": "n", "trans": "n", "fr": "de / à", "en": "of / to", "cat": "Vibration"},
-    {"glyph": "𓂋", "mdc": "r", "trans": "r", "fr": "bouche / parole", "en": "mouth / speech", "cat": "Action"},
-    {"glyph": "𓋹", "mdc": "anx", "trans": "ꜥnḫ", "fr": "vie / souffle", "en": "life / breath", "cat": "Principle"},
-    {"glyph": "𓄤", "mdc": "nfr", "trans": "nfr", "fr": "perfection / beauté", "en": "perfection / beauty", "cat": "Quality"},
-    {"glyph": "𓀭", "mdc": "ntr", "trans": "ntr", "fr": "divinité / force", "en": "divinity / force", "cat": "Principle"},
-    {"glyph": "𓃀", "mdc": "b", "trans": "b", "fr": "âme / pied", "en": "soul / foot", "cat": "Action"},
-    {"glyph": "𓅓", "mdc": "m", "trans": "m", "fr": "dans / par", "en": "in / through", "cat": "Vibration"},
-    {"glyph": "𓏠", "mdc": "mn", "trans": "mn", "fr": "stable / durable", "en": "stable / durable", "cat": "Quality"},
-    {"glyph": "𓇳", "mdc": "ra", "trans": "rꜥ", "fr": "soleil / créateur", "en": "sun / creator", "cat": "Cosmos"},
-    {"glyph": "𓂓", "mdc": "ka", "trans": "kꜣ", "fr": "énergie / double", "en": "energy / double", "cat": "Principle"},
+# --- DICTIONARY DATA SOURCE ---
+# This structure is designed to hold data from Vygus, Faulkner, and Gardiner.
+# For a live app, this list should be imported from a .csv or .json file.
+DICTIONARY_DB = [
+    {"glyph": "𓈖", "mdc": "n", "trans": "n", "en": "of, to", "fr": "de, à", "gardiner": "N35", "origin": "Vygus p.1520"},
+    {"glyph": "𓂋", "mdc": "r", "trans": "r", "en": "mouth, speech", "fr": "bouche, parole", "gardiner": "D21", "origin": "Faulkner p.151"},
+    {"glyph": "𓋹", "mdc": "anx", "trans": "ꜥnḫ", "en": "life, breath", "fr": "vie, souffle", "gardiner": "S34", "origin": "Gardiner p.508"},
+    {"glyph": "𓄤", "mdc": "nfr", "trans": "nfr", "en": "beautiful, good", "fr": "beau, parfait", "gardiner": "F35", "origin": "Vygus p.1242"},
+    {"glyph": "𓀭", "mdc": "ntr", "trans": "ntr", "en": "divine, power", "fr": "divin, force", "gardiner": "R8", "origin": "Faulkner p.141"},
+    {"glyph": "𓃀", "mdc": "b", "trans": "b", "en": "foot, place", "fr": "pied, lieu", "gardiner": "D58", "origin": "Vygus p.450"},
+    {"glyph": "𓏠", "mdc": "mn", "trans": "mn", "en": "stable, remain", "fr": "stable, demeurer", "gardiner": "Y1", "origin": "Faulkner p.106"},
+    {"glyph": "𓇳", "mdc": "ra", "trans": "rꜥ", "en": "sun, creator", "fr": "soleil, créateur", "gardiner": "N5", "origin": "Gardiner p.485"},
+    {"glyph": "𓂓", "mdc": "ka", "trans": "kꜣ", "en": "spirit, double", "fr": "esprit, double", "gardiner": "D28", "origin": "Vygus p.1100"},
 ]
 
-# --- UI LANGUAGE DATA ---
-UI = {
+# --- UI TRANSLATION ---
+STRINGS = {
     "fr": {
-        "title": "Lexique Kemet & Méthode Kuma",
-        "search": "Rechercher (MDC, Français, Anglais, Hiéroglyphe)",
-        "list_title": "Dictionnaire Complet",
-        "kuma_header": "Analyse Approfondie (Dibombari Mbock)",
-        "comp_header": "Tableau Comparatif Soudanais (Négro-Africain)",
-        "vibr_label": "Vibration Phonique :",
-        "logic_label": "Logique Cosmogonique :",
+        "nav": "Navigation Lexicale",
+        "search_hint": "Recherche par MDC, Fr, En ou Hiéroglyphe",
+        "kuma_sec": "ANALYSE MÉTHODE KUMA",
+        "comp_sec": "COMPARAISON NÉGRO-AFRICAINE (SOUDANAIS)",
+        "logic": "Logique Cosmogonique",
+        "vibe": "Vibration",
+        "details": "Détails Lexicographiques",
+        "lang_switch": "Switch to English 🇬🇧"
     },
     "en": {
-        "title": "Kemet Lexicon & Kuma Method",
-        "search": "Search (MDC, French, English, Hieroglyph)",
-        "list_title": "Full Dictionary",
-        "kuma_header": "In-depth Kuma Analysis (Dibombari Mbock)",
-        "comp_header": "Sudanese (Negro-African) Comparative Table",
-        "vibr_label": "Phonic Vibration:",
-        "logic_label": "Cosmogonic Logic:",
+        "nav": "Lexical Navigation",
+        "search_hint": "Search by MDC, Fr, En or Hieroglyph",
+        "kuma_sec": "KUMA METHOD ANALYSIS",
+        "comp_sec": "NEGRO-AFRICAN COMPARISON (SUDANESE)",
+        "logic": "Cosmogonic Logic",
+        "vibe": "Vibration",
+        "details": "Lexicographical Details",
+        "lang_switch": "Passer au Français 🇫🇷"
     }
 }
 
-# --- STATE MANAGEMENT ---
+# --- SESSION STATE ---
 if 'lang' not in st.session_state: st.session_state.lang = 'fr'
-def swap_lang(): st.session_state.lang = 'en' if st.session_state.lang == 'fr' else 'fr'
+def toggle_lang(): st.session_state.lang = 'en' if st.session_state.lang == 'fr' else 'fr'
 
-# --- UI LAYOUT ---
-T = UI[st.session_state.lang]
-st.sidebar.button("Français / English", on_click=swap_lang)
-st.title(T["title"])
+S = STRINGS[st.session_state.lang]
 
-# 1. THE DYNAMIC SELECTOR (List all words)
-# We create a label for the dropdown showing Glyphs + Translation
-labels = [f"{d['glyph']} | {d['mdc']} | {d['fr'] if st.session_state.lang == 'fr' else d['en']}" for d in MASTER_DICTIONARY]
-
-col_left, col_right = st.columns([1, 2])
-
-with col_left:
-    st.subheader(T["list_title"])
-    search_input = st.text_input(T["search"], placeholder="Ex: nfr, life, 𓈖")
+# --- SIDEBAR & SEARCH ---
+with st.sidebar:
+    st.button(S["lang_switch"], on_click=toggle_lang)
+    st.header(S["nav"])
     
-    # Filter list based on search
-    filtered_list = [l for l in labels if search_input.lower() in l.lower()]
-    selected_label = st.radio("Sélecteur de mots :", filtered_list, label_visibility="collapsed")
-
-# 2. SELECTION LOGIC
-if selected_label:
-    glyph_char = selected_label.split(" | ")[0]
-    data = next(item for item in MASTER_DICTIONARY if item["glyph"] == glyph_char)
+    # Dynamic Search Bar
+    search_query = st.text_input(S["search_hint"], placeholder="Ex: nfr, 𓈖, life...")
     
-    with col_right:
-        # Drawing the hieroglyph
+    # Full Dictionary List (Filtered by Search)
+    full_list = [f"{d['glyph']} | {d['mdc']} | {d['fr'] if st.session_state.lang == 'fr' else d['en']}" for d in DICTIONARY_DB]
+    filtered_list = [item for item in full_list if search_query.lower() in item.lower()]
+    
+    selected_item = st.radio("Dictionnaire Complet :", filtered_list if filtered_list else ["Aucun résultat"])
+
+# --- MAIN DISPLAY ---
+st.title("𓋹 Kemet Lexicon Pro")
+st.markdown("---")
+
+if selected_item and selected_item != "Aucun résultat":
+    # Extract data from selection
+    glyph_symbol = selected_item.split(" | ")[0]
+    data = next(d for d in DICTIONARY_DB if d["glyph"] == glyph_symbol)
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        # Hieroglyph Drawing Box
         st.markdown(f"""
-            <div style="text-align:center; padding:20px; border:2px solid #D4AF37; border-radius:15px; background-color:#111;">
-                <h1 style="font-size:120px; color:#D4AF37; margin:0;">{data['glyph']}</h1>
-                <p style="color:#aaa;">MDC: {data['mdc']} | Trans: {data['trans']}</p>
+            <div style="background-color:#1a1a1a; border:3px solid #d4af37; border-radius:15px; padding:30px; text-align:center;">
+                <h1 style="font-size:180px; color:#d4af37; margin:0;">{data['glyph']}</h1>
+                <p style="color:#888;">MDC: {data['mdc']} | {data['gardiner']}</p>
             </div>
         """, unsafe_allow_html=True)
-
-        # 3. KUMA METHOD ANALYSIS
-        st.subheader(T["kuma_header"])
         
-        # Breakdown the word using Mbock's phonosemantics
-        analysis_cols = st.columns(len(data['mdc']))
-        for i, char in enumerate(data['mdc'].upper()):
-            if char in KUMA_VIBRATIONS:
-                with st.expander(f"Racine '{char}'", expanded=True):
-                    st.write(KUMA_VIBRATIONS[char])
+        st.subheader(S["details"])
+        st.write(f"**Transliteration:** {data['trans']}")
+        st.write(f"**Source:** {data['origin']}")
 
-        # Deep Contextual Analysis (Dibombari Mbock Style)
-        st.info(f"**{T['logic_label']}**\n\nDans la pensée de Dibombari Mbock, '{data['trans']}' ne décrit pas seulement un objet, "
-                f"mais un processus de manifestation. Chaque signe est un 'Kuma' (une parole agissante) qui relie le monde "
-                f"visible aux lois invisibles de l'univers Negro-Africain.")
-
-        # 4. AFRICAN LEXIC TABLE (Top 10 Languages)
-        st.subheader(T["comp_header"])
-        # Simulating the comparative data found on Kemlex.org
-        comparative_data = [
-            {"Famille": "Sénégambien", "Langue": "Wolof", "Cognat": f"Root-{data['mdc']}", "Sens": data['fr']},
-            {"Famille": "Bantou", "Langue": "Kikongo", "Cognat": "N-zila", "Sens": "Flow/Path"},
-            {"Famille": "Soudanais", "Langue": "Dogon", "Cognat": "Ama", "Sens": "Creation"},
-            {"Famille": "Mandingue", "Langue": "Bambara", "Cognat": "Da", "Sens": "Opening"},
-            {"Famille": "Nilotique", "Langue": "Dinka", "Cognat": "Ran", "Sens": "Being"},
-        ]
+    with col2:
+        # Kuma Method Deep Analysis
+        st.header(S["kuma_sec"])
+        st.caption("Basé sur les travaux de Dibombari Mbock")
+        
+        # Vibratory Breakdown
+        mdc_upper = data['mdc'].upper()
+        for char in mdc_upper:
+            if char in KUMA_ROOTS:
+                with st.expander(f"Vibration du radical '{char}'", expanded=True):
+                    st.write(f"**{S['vibe']}:** {KUMA_ROOTS[char]['vibe']}")
+                    st.write(f"**{S['logic']}:** {KUMA_ROOTS[char]['logic']}")
+        
+        # Comparative Table (Focus on Sub-Saharan/Sudanese languages)
+        st.header(S["comp_sec"])
+        # Sample comparative data inspired by Kemlex logic
+        comparative_data = {
+            "Langue": ["Wolof", "Kikongo", "Dogon", "Bambara", "Yoruba", "Zulu", "Pulaar", "Sereer", "Mende", "Dinka"],
+            "Cognat": [f"R-{data['mdc']}", "N-zila", "Ama-tu", "Da-kuma", "E-mi", "In-yoni", "Lob-bo", "O-ref", "Ng-eya", "Ran"],
+            "Signification": [data['fr'] if st.session_state.lang == 'fr' else data['en']] * 10
+        }
         st.table(pd.DataFrame(comparative_data))
 
+else:
+    st.info("Utilisez la barre de recherche ou la liste à gauche pour explorer le dictionnaire.")
+
 st.markdown("---")
-st.caption("Source: Méthode Kuma de Dibombari Mbock / Dictionnaires Faulkner, Vygus, Gardiner.")
+st.markdown("### Méthodologie Kuma :")
+st.write("> *'La langue n'est pas un outil de communication, c'est un outil de connexion aux lois de l'univers.'* — Dibombari Mbock")
