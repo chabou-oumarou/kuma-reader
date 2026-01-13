@@ -1,130 +1,92 @@
 import streamlit as st
 import pandas as pd
-import pdfplumber
-import re
 
-# --- APP CONFIG & LUXURY THEME ---
-st.set_page_config(page_title="Kuma Lab: Manden Edition", layout="wide")
+# --- CONFIGURATION DE L'APP ---
+st.set_page_config(page_title="Kuma Lexicon - Mbock Edition", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #050505; color: #f4e4bc; }
-    .stSelectbox div[data-baseweb="select"] > div { background-color: #1a1a1a; color: #d4af37; border: 1px solid #d4af37; }
-    .kuma-box { border-left: 5px solid #d4af37; padding: 20px; background: #111; margin-bottom: 25px; border-radius: 0 15px 15px 0; }
-    .glyph-font { font-size: 100px; color: #d4af37; text-align: center; font-family: 'serif'; }
-    .manden-highlight { color: #c9a54d; font-weight: bold; font-size: 1.1em; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- DEEP KUMA VIBRATIONAL ENGINE (Dibombari Mbock / Manden Paradigm) ---
+# --- MOTEUR PHONOSÉMANTIQUE KUMA (DIBOMBARI MBOCK) ---
+# Chaque consonne est une vibration représentant un principe universel.
 KUMA_RULES = {
-    "N": {
-        "principle": "Nun / L'Onde Primordiale",
-        "desc": "Représente l'émergence hors de l'abîme. C'est la vibration nasale qui porte l'énergie de la vie avant sa densification. C'est le fluide de transmission.",
-        "manden": "Nu (Nez/Souffle), Ni (Âme/Énergie vitale), Nan-folo (L'origine première)."
-    },
-    "K": {
-        "principle": "Ka / La Cohésion Spéculaire",
-        "desc": "L'énergie double, le contenant de l'identité. La force qui maintient l'intégrité de la forme et empêche la dispersion de l'esprit.",
-        "manden": "Ka (Faire/Devenir), Kuma (La Parole/Le Verbe qui structure), Kan (Le cou/La voix)."
-    },
-    "R": {
-        "principle": "Ra / Le Rayonnement du Verbe",
-        "desc": "L'ouverture et la projection. C'est le principe solaire qui illumine et rend l'existence manifeste à travers le son et la lumière.",
-        "manden": "Ra / La (Suffixe de lieu/mouvement), Ye-ra (Apparaître), Ra-da (Porte d'entrée)."
-    },
-    "M": {
-        "principle": "Ma / La Matrice Génératrice",
-        "desc": "Le milieu de gestation. Le passage du monde invisible (Esprit) au monde visible (Matière). Le principe de la Mère Universelle.",
-        "manden": "Ma (La personne/L'humain), Muso (La Femme), Bamako (Le dos du crocodile/La base)."
-    },
-    "B": {
-        "principle": "Ba / L'Âme Incarnée",
-        "desc": "L'âme en mouvement dans un réceptacle physique. Représente l'ancrage, la solidité et la manifestation terrestre de la volonté.",
-        "manden": "Ba (Grandeur/Fleuve), Bolo (Le bras/L'instrument de l'action)."
-    },
-    "S": {
-        "principle": "Se / La Causalité Directrice",
-        "desc": "Le flux ordonnateur qui dirige l'énergie vers un but précis. C'est la force de régulation et de maîtrise du chaos.",
-        "manden": "Se (Le pouvoir/La capacité), Sira (Le chemin/La voie tracée)."
-    },
-    "T": {
-        "principle": "Ta / La Stabilité Terrestre",
-        "desc": "Le point d'ancrage final, la terre nourricière. La manifestation de la forme finie et stabilisée.",
-        "manden": "Ta (Prendre/Feu), Dugutigi (Chef de terre)."
-    }
+    "N": {"principle": "L'émergence (Nun)", "desc": "L'énergie de l'onde primordiale, la transmission de la vie."},
+    "R": {"principle": "Le Verbe (Ra)", "desc": "L'ouverture, le rayonnement solaire, la parole qui crée."},
+    "K": {"principle": "La Cohésion (Ka)", "desc": "L'esprit double, la force qui maintient la forme."},
+    "M": {"principle": "La Matrice (Mut)", "desc": "Le milieu de transformation, le passage de l'esprit à la matière."},
+    "B": {"principle": "L'Incarnation (Ba)", "desc": "Le mouvement de l'âme dans le réceptacle physique."},
+    "H": {"principle": "Le Souffle (Heh)", "desc": "L'éternité, l'élément invisible qui anime le tout."},
+    "S": {"principle": "La Causalité", "desc": "Le flux qui ordonne et dirige l'énergie."},
+    "F": {"principle": "L'Expansion", "desc": "Le déploiement de la force dans l'espace."},
+    "T": {"principle": "La Stabilité", "desc": "Le point d'ancrage, la manifestation terrestre."}
 }
 
-# --- WEST AFRICAN COMPARATIVE DATA (10 ROWS) ---
-def get_west_african_lexicon(root):
-    data = [
-        {"Pays": "Mali", "Langue": "Bambara", "Cognat": f"{root}-kala", "Context": "Lien vital/Énergie"},
-        {"Pays": "Niger", "Langue": "Hausa", "Cognat": f"Ba-{root}", "Context": "Manifestation"},
-        {"Pays": "Burkina Faso", "Langue": "Mossi", "Cognat": f"Ka-{root}", "Context": "Esprit ancestral"},
-        {"Pays": "Mali", "Langue": "Dogon", "Cognat": f"Ama-{root}", "Context": "Dieu créateur"},
-        {"Pays": "Sénégal", "Langue": "Wolof", "Cognat": f"N-{root}-gal", "Context": "Flux/Eau"},
-        {"Pays": "Guinée", "Langue": "Malinké", "Cognat": f"Ku-{root}", "Context": "Parole/Tête"},
-        {"Pays": "Bénin", "Langue": "Fon", "Cognat": f"Bo-{root}", "Context": "Puissance magique"},
-        {"Pays": "Côte d'Ivoire", "Langue": "Baoulé", "Cognat": f"{root}-wa", "Context": "Existence"},
-        {"Pays": "Ghana", "Langue": "Akan", "Cognat": f"O-{root}-m", "Context": "Nation/Peuple"},
-        {"Pays": "Tchad", "Langue": "Sara", "Cognat": f"Ta-{root}", "Context": "Ancrage/Terre"}
-    ]
-    return pd.DataFrame(data)
+# --- DONNÉES DU DICTIONNAIRE (VYGUS / FAULKNER / GARDINER) ---
+DICTIONARY_DATA = [
+    {"glyph": "𓈖", "mdc": "n", "trans": "n", "en": "of, to", "fr": "de, à", "gardiner": "N35", "source": "Vygus p.1520"},
+    {"glyph": "𓂋", "mdc": "r", "trans": "r", "en": "mouth, speech", "fr": "bouche, parole", "gardiner": "D21", "source": "Faulkner p.151"},
+    {"glyph": "𓋹", "mdc": "anx", "trans": "ꜥnḫ", "en": "life, breath", "fr": "vie, souffle", "gardiner": "S34", "source": "Gardiner p.508"},
+    {"glyph": "𓄤", "mdc": "nfr", "trans": "nfr", "en": "beautiful, good", "fr": "perfection, harmonie", "gardiner": "F35", "source": "Vygus p.1242"},
+    {"glyph": "𓇳", "mdc": "ra", "trans": "rꜥ", "en": "sun, creator", "fr": "soleil, créateur", "gardiner": "N5", "source": "Gardiner p.485"},
+    {"glyph": "𓂓", "mdc": "ka", "trans": "kꜣ", "en": "spirit, double", "fr": "énergie vitale, Ka", "gardiner": "D28", "source": "Vygus p.1100"},
+    {"glyph": "𓅓", "mdc": "m", "trans": "m", "en": "in, through", "fr": "dans, par (matrice)", "gardiner": "G17", "source": "Faulkner p.102"},
+    {"glyph": "𓊹", "mdc": "ntr", "trans": "ntr", "en": "divine, god", "fr": "force divine, Neter", "gardiner": "R8", "source": "Vygus p.1310"},
+    {"glyph": "𓃀", "mdc": "b", "trans": "b", "en": "foot", "fr": "place, incarnation", "gardiner": "D58", "source": "Gardiner p.456"},
+    {"glyph": "𓏠", "mdc": "mn", "trans": "mn", "en": "stable, remain", "fr": "stabilité, Men", "gardiner": "Y1", "source": "Faulkner p.106"},
+    {"glyph": "𓉐", "mdc": "pr", "trans": "pr", "en": "house, go out", "fr": "maison, émergence", "gardiner": "O1", "source": "Vygus p.890"},
+    {"glyph": "𓇋", "mdc": "i", "trans": "ı͗", "en": "I, me", "fr": "unité, soi", "gardiner": "M17", "source": "Faulkner p.1"},
+]
 
-# --- PDF PROCESSING ---
-@st.cache_data
-def extract_dictionary_roots(file):
-    lexicon = []
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages[:30]: # Processing first 30 pages
-            text = page.extract_text()
-            if text:
-                # Regex for typical transliterations (MDC)
-                words = re.findall(r'\b[a-zꜣꜥı͗ḥḫẖśšḳṭḏ]{2,7}\b', text.lower())
-                lexicon.extend(words)
-    return sorted(list(set(lexicon)))
+# --- LOGIQUE DE L'INTERFACE ---
+if 'lang' not in st.session_state: st.session_state.lang = 'fr'
+def swap_lang(): st.session_state.lang = 'en' if st.session_state.lang == 'fr' else 'fr'
 
-# --- SIDEBAR & UPLOAD ---
-with st.sidebar:
-    st.markdown("<h2 style='text-align:center;'>𓋹 KUMA LAB PRO</h2>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Bulk Upload Dictionary (PDF)", type="pdf")
-    st.markdown("---")
-    st.info("Ce laboratoire analyse les vibrations phonétiques du Medu Neter selon le paradigme Manden.")
+S = {"fr": {"search": "Recherche (MDC, Français, Glyphe)", "kuma": "ANALYSE KUMA (D. MBOCK)", "comp": "LEXIQUE NÉGRO-AFRICAIN", "details": "Détails Lexicographiques", "btn": "English 🇬🇧"},
+     "en": {"search": "Search (MDC, French, Glyph)", "kuma": "KUMA ANALYSIS (D. MBOCK)", "comp": "NEGRO-AFRICAN LEXICON", "details": "Lexicographical Details", "btn": "Français 🇫🇷"}}[st.session_state.lang]
 
-# --- MAIN PAGE ---
-st.title("Système de Lexicographie Vibratoire")
+st.sidebar.button(S["btn"], on_click=swap_lang)
+st.title("𓋹 Medu Neter: Kuma Lab")
 
-if uploaded_file:
-    # 1. Populate Dropdown from PDF
-    with st.spinner("Analyse du dictionnaire en cours..."):
-        all_roots = extract_dictionary_roots(uploaded_file)
+# 1. RECHERCHE ET SÉLECTION
+search_query = st.text_input(S["search"], placeholder="Ex: nfr, 𓋹, perfection...")
+
+# Filtrage de la liste basé sur la recherche
+filtered = [d for d in DICTIONARY_DATA if search_query.lower() in f"{d['mdc']} {d['en']} {d['fr']} {d['glyph']}".lower()]
+
+if filtered:
+    # Utilisation d'un selectbox pour une sélection précise
+    # L'affichage est restreint au hiéroglyphe seul pour la sélection
+    selected_glyph = st.sidebar.selectbox("Sélectionnez un Hiéroglyphe :", [d['glyph'] for d in filtered])
     
-    # Dropdown Selection
-    selected_root = st.selectbox("📚 Sélectionnez une racine détectée dans le dictionnaire :", all_roots)
+    # Récupération des données complètes pour l'élément sélectionné
+    data = next(item for item in DICTIONARY_DATA if item["glyph"] == selected_glyph)
     
-    if selected_root:
-        # 2. Display Hieroglyphic Drawing (Placeholder for SVG/Font)
-        st.markdown(f"<div class='glyph-font'>𓋹 {selected_root.upper()} 𓊪</div>", unsafe_allow_html=True)
-        
-        col1, col2 = st.columns([1.5, 1])
-        
-        with col1:
-            st.header("Analyse Kuma Approfondie")
-            for char in selected_root.upper():
-                if char in KUMA_RULES:
-                    with st.container():
-                        st.markdown(f"<div class='kuma-box'><h3>Vibration {char} : {KUMA_RULES[char]['principle']}</h3>", unsafe_allow_html=True)
-                        st.write(KUMA_RULES[char]['desc'])
-                        st.markdown(f"<span class='manden-highlight'>Paradigme Manden :</span> {KUMA_RULES[char]['manden']}", unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-        
-        with col2:
-            st.header("Comparaison Ouest-Africaine")
-            st.write("Corrélations entre l'Égypte et l'Afrique de l'Ouest :")
-            st.table(get_west_african_lexicon(selected_root))
+    # 2. AFFICHAGE DYNAMIQUE (L'ancienne sélection est remplacée)
+    col_vis, col_ana = st.columns([1, 2])
+    
+    with col_vis:
+        st.markdown(f"<div style='border:4px solid #d4af37; padding:20px; text-align:center; background:#111; border-radius:15px;'>"
+                    f"<h1 style='font-size:180px; color:#d4af37; margin:0;'>{data['glyph']}</h1>"
+                    f"<p style='color:#777;'>Gardiner: {data['gardiner']}</p></div>", unsafe_allow_html=True)
+        st.write(f"**{S['details']}**")
+        st.info(f"Translittération: {data['trans']}\n\nSource: {data['source']}")
 
+    with col_ana:
+        st.header(S["kuma"])
+        st.subheader(f"Mot analysé : {data['glyph']}")
+        # Logique Kuma : Décomposer la chaîne MDC en vibrations phoniques
+        for char in data['mdc'].upper():
+            if char in KUMA_RULES:
+                with st.expander(f"Vibration '{char}' - {KUMA_RULES[char]['principle']}", expanded=True):
+                    st.write(KUMA_RULES[char]['desc'])
+        
+        st.subheader(S["comp"])
+        # Tableau comparatif de 10 langues soudanaises / subsahariennes
+        comp_df = pd.DataFrame({
+            "Langue": ["Wolof", "Kikongo", "Bambara", "Yoruba", "Dogon", "Lingala", "Zulu", "Pulaar", "Mende", "Fang"],
+            "Terme Cognat": [f"Root-{data['mdc']}", "N-zila", "Da-kuma", "E-mi", "Ama", "Nini", "Inyoni", "Lobbo", "Ngeya", "Enim"],
+            "Contexte": ["Vibration vitale", "Flux de l'esprit", "Parole sacrée", "Respiration", "Origine", "Identité", "Étincelle", "Harmonie", "Lien", "Force"]
+        })
+        st.table(comp_df)
 else:
-    st.warning("Veuillez charger un fichier PDF pour activer la liste déroulante du dictionnaire.")
+    st.warning("Aucun résultat trouvé.")
 
 st.markdown("---")
-st.caption("Base de données issue du paradigme Manden & Travaux de Dibombari Mbock.")
+st.write("📖 *'Le Medu Neter est le code génétique des langues africaines.'* — Dibombari Mbock")
