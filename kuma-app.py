@@ -1,83 +1,121 @@
 import streamlit as st
 import pandas as pd
 
-# Page Config
-st.set_page_config(page_title="Kuma Method Reader", page_icon="𓃠", layout="wide")
+# Page Setup
+st.set_page_config(page_title="Kuma Method Reader - Manden Edition", layout="wide")
 
-# Custom Styling for an "Egyptian/African Lexicon" feel
+# --- Custom Styling ---
 st.markdown("""
     <style>
-    .stApp { background-color: #f4ece1; }
-    .kuma-box {
-        background-color: #ffffff;
+    .stApp { background-color: #fcfaf3; }
+    .kuma-card {
         padding: 25px;
-        border-radius: 15px;
-        border-right: 8px solid #c0a080;
-        box-shadow: 2px 2px 15px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
+        background-color: #ffffff;
+        border-top: 5px solid #d4af37;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+        border-radius: 8px;
     }
-    .glyph-large { font-size: 60px; color: #3d2b1f; }
+    .manden-badge {
+        background-color: #4a2c2a;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8em;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- Data Engine ---
-@st.cache_data
-def get_lexicon():
-    # In a production app, you would scrape/import this from kemlex.org or a CSV
-    return pd.DataFrame([
-        {"sign": "𓇳", "code": "N5", "meaning": "Ra / Sun", "kuma_logic": "The Eye of the Creator; the principle of expansion and central vitality.", "african_root": "Bantu: -diba (Sun/Eye)"},
-        {"sign": "𓀀", "code": "A1", "meaning": "Man", "kuma_logic": "The Muntu; the receptacle of the Word (Logos).", "african_root": "Dual: Moto (Person)"},
-        {"sign": "𓅃", "code": "G5", "meaning": "Heru / Falcon", "kuma_logic": "The principle of spiritual elevation and the 'Ka' in action.", "african_root": "Yoruba: Eye (Bird/Spirit)"},
+# --- Multilingual Translation Dict ---
+T = {
+    "en": {
+        "title": "Kuma Method: Manden & Dogon Cosmogony",
+        "subtitle": "Analysis of Hieroglyphs via the African Root (Dibombari Mbock)",
+        "input_header": "Add New Sign from Kemlex.org",
+        "search": "Search a sign or concept...",
+        "logic": "Cosmogonic Logic (Manden/Dogon)",
+        "root": "Linguistic Root (Bambara/Dogon)",
+        "save": "Add to Local Database",
+        "export": "Export Research",
+        "view": "Lexicon View"
+    },
+    "fr": {
+        "title": "Méthode Kuma : Cosmogonie Manden & Dogon",
+        "subtitle": "Analyse des Hiéroglyphes via la Racine Africaine (Dibombari Mbock)",
+        "input_header": "Ajouter un signe via Kemlex.org",
+        "search": "Rechercher un signe ou un concept...",
+        "logic": "Logique Cosmogonique (Manden/Dogon)",
+        "root": "Racine Linguistique (Bambara/Dogon)",
+        "save": "Ajouter à la base locale",
+        "export": "Exporter la recherche",
+        "view": "Vue Lexique"
+    }
+}
+
+# --- Language Selection ---
+lang = st.sidebar.selectbox("Language / Langue", ["fr", "en"])
+
+# --- Persistent Data Storage ---
+if 'db' not in st.session_state:
+    st.session_state.db = pd.DataFrame([
+        {
+            "Sign": "𓇳", 
+            "Meaning": "Ra / Soleil", 
+            "Kuma_Logic": "Principe de l'Amma Dogon; l'oeuf primordial ou l'oeil du créateur.",
+            "Manden_Root": "Bambara: 'Tle' (Soleil/Temps)"
+        }
     ])
 
-df = get_lexicon()
-
 # --- UI Layout ---
-st.title("𓋹 Kuma Method Hieroglyph Analyser")
-st.caption("A symbolic bridge between Ancient Kemet and African Lingustics (via Dibombari Mbock)")
+st.title(T[lang]["title"])
+st.caption(T[lang]["subtitle"])
 
-tabs = st.tabs(["🔍 Interactive Reader", "📚 Kuma Principles", "📤 Data Sync"])
+tab1, tab2 = st.tabs([T[lang]["view"], T[lang]["input_header"]])
 
-with tabs[0]:
-    col1, col2 = st.columns([1, 2])
+with tab1:
+    search = st.text_input(T[lang]["search"])
     
-    with col1:
-        st.subheader("Select a Sign")
-        selected_sign = st.selectbox("Choose from Lexicon", df['sign'] + " " + df['meaning'])
-        sign_char = selected_sign.split()[0]
-        entry = df[df['sign'] == sign_char].iloc[0]
+    # Filter display
+    filtered_df = st.session_state.db[
+        st.session_state.db.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)
+    ]
 
-    with col2:
+    for _, row in filtered_df.iterrows():
         st.markdown(f"""
-        <div class="kuma-box">
-            <div class="glyph-large">{entry['sign']}</div>
-            <h2>{entry['meaning']}</h2>
-            <p><strong>Gardiner Code:</strong> {entry['code']}</p>
-            <hr>
-            <h4>Kuma Symbolic Logic:</h4>
-            <p>{entry['kuma_logic']}</p>
-            <h4>African Linguistic Root:</h4>
-            <p><em>{entry['african_root']}</em></p>
+        <div class="kuma-card">
+            <span class="manden-badge">Manden Cosmogony</span>
+            <h1 style="font-size: 80px; margin: 0;">{row['Sign']}</h1>
+            <h3>{row['Meaning']}</h3>
+            <p><strong>{T[lang]['logic']}:</strong><br>{row['Kuma_Logic']}</p>
+            <p><strong>{T[lang]['root']}:</strong><br><em>{row['Manden_Root']}</em></p>
         </div>
         """, unsafe_allow_html=True)
 
-with tabs[1]:
-    st.header("The Epistemology of Kuma")
-    st.markdown("""
-    The **Kuma Method** (Ibis Method) shifts the focus from purely phonetic 'sounds' to 
-    the **Cosmogonic intent** of the scribe. 
-    
-    * **The Hieroglyph is a Concept:** It represents a law of nature.
-    * **The African Connection:** Using Kemlex resources, we find that the roots of 
-        Medù Nèter are found in modern African languages (Bantu, Wolof, Dogon).
-    """)
+with tab2:
+    st.subheader(T[lang]["input_header"])
+    with st.form("kemlex_input"):
+        col1, col2 = st.columns(2)
+        with col1:
+            new_sign = st.text_input("Glyph (Copy from Kemlex)")
+            new_meaning = st.text_input("Common Meaning / Sens Commun")
+        with col2:
+            new_root = st.text_input("Bambara/Dogon Root")
+            
+        new_logic = st.text_area("Kuma Symbolic Logic (Philosophical)")
+        
+        submit = st.form_submit_button(T[lang]["save"])
+        
+        if submit:
+            new_entry = {
+                "Sign": new_sign, 
+                "Meaning": new_meaning, 
+                "Kuma_Logic": new_logic, 
+                "Manden_Root": new_root
+            }
+            st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([new_entry])], ignore_index=True)
+            st.success("Entry added / Entrée ajoutée !")
 
-with tabs[2]:
-    st.header("Kemlex Integration")
-    st.write("Upload your exported CSV from Kemlex.org to update the local database.")
-    uploaded_file = st.file_uploader("Upload CSV", type="csv")
-    if uploaded_file:
-        st.success("Database updated successfully!")
-
-st.divider()
-st.info("💡 Tip: Use the search bar in the sidebar to filter by African root words.")
+# Sidebar Tools
+st.sidebar.markdown("---")
+st.sidebar.subheader(T[lang]["export"])
+st.sidebar.download_button("Download CSV", st.session_state.db.to_csv(index=False), "kuma_research.csv")
