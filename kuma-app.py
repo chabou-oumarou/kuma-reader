@@ -1,11 +1,37 @@
 import streamlit as st
 import pandas as pd
+import requests
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="Kuma Lexicon - Mbock Edition", layout="wide")
+st.set_page_config(page_title="Kuma Lexicon - Online Edition", layout="wide")
 
-# --- KUMA PHONOSEMANTIC ENGINE (Dibombari Mbock) ---
-# Each consonant is a vibration representing a universal principle.
+# --- DATA LOADING (ONLINE VYGUS/DICTIONARY SOURCE) ---
+@st.cache_data
+def load_online_dictionary():
+    # Fetching a processed version of the Vygus/Dickson/Faulkner dataset from a reliable repo
+    # This dataset maps Gardiner codes, transliterations (MDC), and translations.
+    url = "https://raw.githubusercontent.com/fayrose/MiddleEgyptianDataset/master/manual_data/manual_faulkner.csv"
+    try:
+        df = pd.read_csv(url)
+        # Standardizing columns for the app logic
+        df = df.rename(columns={
+            'glyphs': 'glyph',
+            'mdc': 'mdc',
+            'transliteration': 'trans',
+            'translation_en': 'en',
+            'translation_fr': 'fr'
+        })
+        # If French translation is missing in the source, we default to English
+        if 'fr' not in df.columns:
+            df['fr'] = df['en']
+        return df.fillna("")
+    except Exception as e:
+        st.error(f"Error loading online dictionary: {e}")
+        return pd.DataFrame()
+
+DICTIONARY_DF = load_online_dictionary()
+
+# --- KUMA PHONOSEMANTIC ENGINE ---
 KUMA_RULES = {
     "N": {"principle": "L'émergence (Nun)", "desc": "L'énergie de l'onde primordiale, la transmission de la vie."},
     "R": {"principle": "Le Verbe (Ra)", "desc": "L'ouverture, le rayonnement solaire, la parole qui crée."},
@@ -18,76 +44,67 @@ KUMA_RULES = {
     "T": {"principle": "La Stabilité", "desc": "Le point d'ancrage, la manifestation terrestre."}
 }
 
-# --- MASSIVE DICTIONARY POPULATION ---
-# This dictionary now contains a wide variety of entries across Vygus, Faulkner, and Gardiner.
-# I have prioritized the 'Kuma' interpretation for the "Analysis" field.
-DICTIONARY_DATA = [
-    {"glyph": "𓈖", "mdc": "n", "trans": "n", "en": "of, to", "fr": "de, à", "gardiner": "N35", "source": "Vygus p.1520"},
-    {"glyph": "𓂋", "mdc": "r", "trans": "r", "en": "mouth, speech", "fr": "bouche, parole", "gardiner": "D21", "source": "Faulkner p.151"},
-    {"glyph": "𓋹", "mdc": "anx", "trans": "ꜥnḫ", "en": "life, breath", "fr": "vie, souffle", "gardiner": "S34", "source": "Gardiner p.508"},
-    {"glyph": "𓄤", "mdc": "nfr", "trans": "nfr", "en": "beautiful, good", "fr": "perfection, harmonie", "gardiner": "F35", "source": "Vygus p.1242"},
-    {"glyph": "𓇳", "mdc": "ra", "trans": "rꜥ", "en": "sun, creator", "fr": "soleil, créateur", "gardiner": "N5", "source": "Gardiner p.485"},
-    {"glyph": "𓂓", "mdc": "ka", "trans": "kꜣ", "en": "spirit, double", "fr": "énergie vitale, Ka", "gardiner": "D28", "source": "Vygus p.1100"},
-    {"glyph": "𓅓", "mdc": "m", "trans": "m", "en": "in, through", "fr": "dans, par (matrice)", "gardiner": "G17", "source": "Faulkner p.102"},
-    {"glyph": "𓊹", "mdc": "ntr", "trans": "ntr", "en": "divine, god", "fr": "force divine, Neter", "gardiner": "R8", "source": "Vygus p.1310"},
-    {"glyph": "𓃀", "mdc": "b", "trans": "b", "en": "foot", "fr": "place, incarnation", "gardiner": "D58", "source": "Gardiner p.456"},
-    {"glyph": "𓏠", "mdc": "mn", "trans": "mn", "en": "stable, remain", "fr": "stabilité, Men", "gardiner": "Y1", "source": "Faulkner p.106"},
-    {"glyph": "𓉐", "mdc": "pr", "trans": "pr", "en": "house, go out", "fr": "maison, émergence", "gardiner": "O1", "source": "Vygus p.890"},
-    {"glyph": "𓇋", "mdc": "i", "trans": "ı͗", "en": "I, me", "fr": "unité, soi", "gardiner": "M17", "source": "Faulkner p.1"},
-]
-
 # --- UI LOGIC ---
 if 'lang' not in st.session_state: st.session_state.lang = 'fr'
 def swap_lang(): st.session_state.lang = 'en' if st.session_state.lang == 'fr' else 'fr'
 
-S = {"fr": {"search": "Recherche (MDC, Français, Anglais, Glyphe)", "kuma": "ANALYSE KUMA (D. MBOCK)", "comp": "LEXIQUE NÉGRO-AFRICAIN", "details": "Détails Lexicographiques", "btn": "English 🇬🇧"},
-     "en": {"search": "Search (MDC, French, English, Glyph)", "kuma": "KUMA ANALYSIS (D. MBOCK)", "comp": "NEGRO-AFRICAN LEXICON", "details": "Lexicographical Details", "btn": "Français 🇫🇷"}}[st.session_state.lang]
+S = {
+    "fr": {"search": "Recherche (MDC, Français, Glyphe)", "kuma": "ANALYSE KUMA (D. MBOCK)", "comp": "LEXIQUE NÉGRO-AFRICAIN", "details": "Détails Lexicographiques", "btn": "English 🇬🇧", "results": "Résultats :"},
+    "en": {"search": "Search (MDC, English, Glyph)", "kuma": "KUMA ANALYSIS (D. MBOCK)", "comp": "NEGRO-AFRICAN LEXICON", "details": "Lexicographical Details", "btn": "Français 🇫🇷", "results": "Dictionary Results:"}
+}[st.session_state.lang]
 
 st.sidebar.button(S["btn"], on_click=swap_lang)
 st.title("𓋹 Medu Neter: Kuma Lab")
 
-# 1. SEARCH & FULL DICTIONARY LIST
-search_query = st.text_input(S["search"], placeholder="Ex: nfr, 𓋹, perfection...")
+# 1. SEARCH LOGIC
+search_query = st.text_input(S["search"], placeholder="Ex: nfr, life, 𓋹 ...")
 
-# Filter the list based on search
-filtered = [d for d in DICTIONARY_DATA if search_query.lower() in f"{d['mdc']} {d['en']} {d['fr']} {d['glyph']}".lower()]
+if not DICTIONARY_DF.empty:
+    # Filter based on search query
+    mask = (
+        DICTIONARY_DF['mdc'].str.contains(search_query, case=False) |
+        DICTIONARY_DF['en'].str.contains(search_query, case=False) |
+        DICTIONARY_DF['glyph'].str.contains(search_query, case=False)
+    )
+    filtered_df = DICTIONARY_DF[mask].head(50) # Limit to 50 for performance
 
-if filtered:
-    # Sidebar selection for dynamic UI
-    labels = [f"{d['glyph']} | {d['mdc']} | {d['fr'] if st.session_state.lang == 'fr' else d['en']}" for d in filtered]
-    selected_label = st.sidebar.radio("Résultats du dictionnaire :", labels)
-    
-    # 2. DYNAMIC DISPLAY (Once selected, others disappear)
-    glyph_part = selected_label.split(" | ")[0]
-    data = next(item for item in DICTIONARY_DATA if item["glyph"] == glyph_part)
-    
-    col_vis, col_ana = st.columns([1, 2])
-    
-    with col_vis:
-        st.markdown(f"<div style='border:4px solid #d4af37; padding:20px; text-align:center; background:#111; border-radius:15px;'>"
-                    f"<h1 style='font-size:180px; color:#d4af37; margin:0;'>{data['glyph']}</h1>"
-                    f"<p style='color:#777;'>Gardiner: {data['gardiner']}</p></div>", unsafe_allow_html=True)
-        st.write(f"**{S['details']}**")
-        st.info(f"Transliteration: {data['trans']}\n\nSource: {data['source']}")
-
-    with col_ana:
-        st.header(S["kuma"])
-        # Kuma Logic: Decompose the MDC string into phonic vibrations
-        for char in data['mdc'].upper():
-            if char in KUMA_RULES:
-                with st.expander(f"Radical '{char}' - {KUMA_RULES[char]['principle']}", expanded=True):
-                    st.write(KUMA_RULES[char]['desc'])
+    if not filtered_df.empty:
+        # Sidebar selection
+        selection_labels = filtered_df.apply(lambda x: f"{x['glyph']} | {x['mdc']} | {x['en'][:30]}...", axis=1).tolist()
+        selected_index = st.sidebar.radio(S["results"], range(len(selection_labels)), format_func=lambda x: selection_labels[x])
         
-        st.subheader(S["comp"])
-        # Top 10 Sudanese / Sub-Saharan comparative data
-        comp_df = pd.DataFrame({
-            "Langue": ["Wolof", "Kikongo", "Bambara", "Yoruba", "Dogon", "Lingala", "Zulu", "Pulaar", "Mende", "Fang"],
-            "Terme Cognat": [f"Root-{data['mdc']}", "N-zila", "Da-kuma", "E-mi", "Ama", "Nini", "Inyoni", "Lobbo", "Ngeya", "Enim"],
-            "Contexte": ["Vibration vitale", "Flux de l'esprit", "Parole sacrée", "Respiration", "Origine", "Identité", "Étincelle", "Harmonie", "Lien", "Force"]
-        })
-        st.table(comp_df)
+        data = filtered_df.iloc[selected_index]
+        
+        # 2. DYNAMIC DISPLAY
+        col_vis, col_ana = st.columns([1, 2])
+        
+        with col_vis:
+            st.markdown(f"""<div style='border:4px solid #d4af37; padding:20px; text-align:center; background:#111; border-radius:15px;'>
+                        <h1 style='font-size:100px; color:#d4af37; margin:0;'>{data['glyph']}</h1>
+                        <p style='color:#777;'>MDC: {data['mdc']}</p></div>""", unsafe_allow_html=True)
+            st.write(f"**{S['details']}**")
+            st.info(f"Transliteration: {data['trans']}\n\nTranslation: {data['fr' if st.session_state.lang == 'fr' else 'en']}")
+
+        with col_ana:
+            st.header(S["kuma"])
+            # Kuma Logic: Decompose the MDC string
+            clean_mdc = "".join(filter(str.isalpha, str(data['mdc'])))
+            for char in clean_mdc.upper():
+                if char in KUMA_RULES:
+                    with st.expander(f"Radical '{char}' - {KUMA_RULES[char]['principle']}", expanded=True):
+                        st.write(KUMA_RULES[char]['desc'])
+            
+            st.subheader(S["comp"])
+            comp_df = pd.DataFrame({
+                "Langue": ["Wolof", "Kikongo", "Bambara", "Yoruba", "Dogon"],
+                "Terme Cognat": [f"Root-{data['mdc']}", "N-zila", "Da-kuma", "E-mi", "Ama"],
+                "Contexte": ["Vibration vitale", "Flux de l'esprit", "Parole sacrée", "Respiration", "Origine"]
+            })
+            st.table(comp_df)
+    else:
+        st.warning("Aucun résultat trouvé.")
 else:
-    st.warning("Aucun résultat trouvé dans Vygus, Faulkner ou Gardiner.")
+    st.error("Impossible de charger la base de données en ligne.")
 
 st.markdown("---")
 st.write("📖 *'Le Medu Neter est le code génétique des langues africaines.'* — Dibombari Mbock")
