@@ -1,113 +1,91 @@
 import streamlit as st
-import json
+import PyPDF2
+import re
 
-# 1. Fallback / Template Data
+# 1. Fallback / Default Data
 default_kuma = {
     "𓇇 (Reed)": {
-        "phonetic": "i",
         "biological_nature": "Vibrating aquatic plant",
-        "kuma_symbolism": "The vibration of the primordial word; movement of the soul.",
-        "african_link": "Kôm (Bassa) - to create or speak."
-    },
-    "𓃀 (Leg)": {
-        "phonetic": "b",
-        "biological_nature": "Lower limb / Support",
-        "kuma_symbolism": "The principle of foundation and implementation of action.",
-        "african_link": "Ba/Be (Bantu) - to exist or become."
+        "kuma_symbolism": "Movement of the soul.",
+        "african_link": "Kôm (Bassa)"
     }
 }
 
-# 2. Page Configuration
-st.set_page_config(page_title="Kuma Reader Pro", page_icon="𓂀", layout="wide")
+st.set_page_config(page_title="Kuma PDF Scholar", page_icon="𓂀", layout="wide")
 
-st.title("𓂀 Kuma Method: Symbolic Decoder")
-st.markdown("---")
+st.title("𓂀 Kuma Method: PDF Intelligence")
+st.markdown("Upload a PDF document containing your research on Ethiopian letters.")
 
-# 3. Sidebar: File Management
-st.sidebar.header("📁 Dictionary Management")
+# 2. Sidebar: PDF Upload
+st.sidebar.header("📁 Source Document")
+uploaded_pdf = st.sidebar.file_uploader("Upload Kuma Research (PDF)", type=["pdf"])
 
-# Upload Functionality
-uploaded_file = st.sidebar.file_uploader("Upload your Kuma JSON Dictionary", type=["json"])
+kuma_data = {}
 
-if uploaded_file is not None:
+if uploaded_pdf is not None:
     try:
-        kuma_data = json.load(uploaded_file)
-        st.sidebar.success("Custom Dictionary Active")
+        # Extract Text from PDF
+        pdf_reader = PyPDF2.PdfReader(uploaded_pdf)
+        full_text = ""
+        for page in pdf_reader.pages:
+            full_text += page.extract_text() + "\n"
+        
+        # 3. Logic: Extracting Hieroglyphic Data
+        # This regex looks for a Hieroglyph character followed by a description
+        # It assumes a format like: 𓃀 Description...
+        # Hieroglyph unicode range is roughly \u13000-\u1342F
+        glyphs_found = re.findall(r'([\u13000-\u1342F])\s*(.*?)(?=[\u13000-\u1342F]|$)', full_text, re.DOTALL)
+        
+        if glyphs_found:
+            for glyph, content in glyphs_found:
+                # Clean up the extracted text
+                clean_content = content.strip().split('\n')
+                kuma_data[f"{glyph} (Extracted)"] = {
+                    "biological_nature": clean_content[0] if len(clean_content) > 0 else "N/A",
+                    "kuma_symbolism": " ".join(clean_content[1:3]) if len(clean_content) > 1 else "Extracted from text",
+                    "african_link": clean_content[-1] if len(clean_content) > 2 else "See PDF"
+                }
+            st.sidebar.success(f"Extracted {len(kuma_data)} signs from PDF!")
+        else:
+            st.sidebar.warning("No hieroglyphs detected. Ensure the PDF contains Unicode hieroglyphs.")
+            kuma_data = default_kuma
+
     except Exception as e:
-        st.sidebar.error(f"Format Error: {e}")
+        st.sidebar.error(f"Error processing PDF: {e}")
         kuma_data = default_kuma
 else:
     kuma_data = default_kuma
-    st.sidebar.info("Using default template data.")
 
-# Template Download (Handy for the user to get started)
-template_json = json.dumps(default_kuma, indent=4)
-st.sidebar.download_button(
-    label="Download JSON Template",
-    data=template_json,
-    file_name="kuma_template.json",
-    mime="application/json"
-)
-
-# 4. Main Interface: Sign Selection
-st.sidebar.divider()
-st.sidebar.subheader("Navigation")
-all_keys = list(kuma_data.keys())
-selected_key = st.sidebar.selectbox("Select a sign for analysis:", all_keys)
-
-if selected_key:
-    entry = kuma_data[selected_key]
-    # Extract just the glyph (the first character)
-    glyph = selected_key.split()[0]
+# 4. Main Interface
+if kuma_data:
+    all_keys = list(kuma_data.keys())
+    selected_key = st.sidebar.selectbox("Analyze Extracted Sign:", all_keys)
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        # High-impact glyph rendering
+        glyph = selected_key.split()[0]
         st.markdown(
             f"""
-            <div style="background-color: #1e1e1e; border-radius: 15px; padding: 20px; text-align: center;">
-                <h1 style="font-size: 160px; color: #FFD700; margin: 0;">{glyph}</h1>
-                <p style="color: #888;">{selected_key}</p>
+            <div style="background-color: #262730; border-radius: 15px; padding: 30px; text-align: center; border: 2px solid #FFD700;">
+                <h1 style="font-size: 150px; color: #FFD700; margin: 0;">{glyph}</h1>
             </div>
             """, 
             unsafe_allow_html=True
         )
 
     with col2:
-        st.header("Metaphysical Intelligence")
+        st.header("Metaphysical Decipherment")
+        entry = kuma_data[selected_key]
         
-        tab1, tab2 = st.tabs(["Biological Identity", "African Context"])
+        st.subheader("Biological Signature")
+        st.info(entry['biological_nature'])
         
-        with tab1:
-            st.subheader("Nature of the Object")
-            st.info(f"**Biology:** {entry['biological_nature']}")
-            st.subheader("Kuma Symbolism")
-            st.write(entry['kuma_symbolism'])
-            
-        with tab2:
-            st.subheader("Linguistic Roots")
-            st.warning(f"**African Cultural Link:** {entry['african_link']}")
+        st.subheader("Symbolic Logic")
+        st.write(entry['kuma_symbolism'])
+        
+        st.subheader("African Connection")
+        st.warning(entry['african_link'])
 
-# 5. Composition Workspace (Experimental)
 st.divider()
-st.subheader("🧪 Kuma Composition")
-st.write("Combine multiple signs to see the synthesis of their biological principles.")
-
-selected_sequence = st.multiselect("Select signs to combine:", all_keys)
-
-if selected_sequence:
-    comp_cols = st.columns(len(selected_sequence))
-    combined_logic = []
-    
-    for i, key in enumerate(selected_sequence):
-        with comp_cols[i]:
-            st.markdown(f"<h2 style='text-align: center;'>{key.split()[0]}</h2>", unsafe_allow_html=True)
-            combined_logic.append(kuma_data[key]['kuma_symbolism'])
-    
-    with st.expander("See Synthesized Meaning"):
-        for logic in combined_logic:
-            st.write(f"• {logic}")
-
-st.markdown("---")
-st.caption("Conceptualized from the work of Dibombari Mbock on Ethiopian Symbolic Letters.")
+st.caption("Note: PDF extraction works best if the hieroglyphs are actual text characters, not images.")
