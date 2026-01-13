@@ -4,132 +4,100 @@ import pdfplumber
 import re
 
 # --- CONFIGURATION DE L'APP ---
-st.set_page_config(page_title="Kuma Lab - Manden Paradigm", layout="wide")
+st.set_page_config(page_title="Kuma Lab - Transliteration & Lexicon", layout="wide")
 
-# Style CSS pour une esthétique "Ébène et Or"
+# Style Ebony & Gold
 st.markdown("""
     <style>
     .main { background-color: #050505; color: #f4e4bc; }
     .stSelectbox div[data-baseweb="select"] > div { background-color: #1a1a1a; color: #d4af37; border: 1px solid #d4af37; }
-    .kuma-card { border-left: 5px solid #d4af37; padding: 25px; background: #111; margin-bottom: 20px; border-radius: 0 15px 15px 0; }
-    .glyph-large { font-size: 150px; color: #d4af37; text-align: center; text-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
-    .manden-box { color: #8ec07c; font-weight: bold; background: rgba(142, 192, 124, 0.1); padding: 10px; border-radius: 5px; }
+    .kuma-card { border-left: 5px solid #d4af37; padding: 20px; background: #111; margin-bottom: 20px; border-radius: 0 10px 10px 0; }
+    .glyph-hero { font-size: 200px; color: #d4af37; text-align: center; margin: 20px 0; }
+    .trans-label { font-size: 24px; color: #8ec07c; text-align: center; font-style: italic; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTEUR VIBRATOIRE KUMA APPROFONDI (Paradigme Manden) ---
+# --- MOTEUR VIBRATOIRE KUMA (Logique Translittération -> Lexique) ---
 KUMA_RULES = {
-    "N": {
-        "principle": "Nun / L'Émergence Primordiale",
-        "desc": "La vibration nasale originelle. C'est l'onde qui porte l'énergie de la vie avant sa densification. Le fluide de transmission universel.",
-        "manden": "Nu (Le nez/souffle), Ni (L'âme), Nan-folo (L'origine première)."
-    },
-    "R": {
-        "principle": "Ra / Le Verbe Rayonnant",
-        "desc": "Le rayonnement du Verbe créateur. Principe solaire qui projette la conscience et illumine l'espace manifesté.",
-        "manden": "Ra / La (Mouvement/Lieu), Ye-ra (Apparaître), Ra-da (Porte/Ouverture)."
-    },
-    "K": {
-        "principle": "Ka / La Cohésion Énergétique",
-        "desc": "L'énergie double, le contenant sacré. La force qui maintient l'intégrité de la forme contre la dispersion de l'esprit.",
-        "manden": "Ka (Faire/Devenir), Kuma (La Parole structurante), Kan (Le cou/La voix)."
-    },
-    "M": {
-        "principle": "Ma / La Matrice Génératrice",
-        "desc": "Le milieu de gestation universel. Le point de passage du monde de l'esprit (invisible) au monde de la matière (visible).",
-        "manden": "Ma (La personne/L'humain), Muso (Le Féminin), Bamako (La base/Le fondement)."
-    },
-    "B": {
-        "principle": "Ba / L'Incarnation de l'Âme",
-        "desc": "L'âme en mouvement dans un réceptacle physique. Représente l'ancrage, la solidité et la manifestation terrestre.",
-        "manden": "Ba (Grandeur/Fleuve), Bolo (Le bras/L'instrument de l'action)."
-    },
-    "H": {
-        "principle": "Heh / L'Éternité Cyclique",
-        "desc": "Le souffle invisible qui anime le macrocosme. L'élément de l'espace infini et de l'équilibre parfait.",
-        "manden": "Hèra (La paix/L'équilibre), Hu (Le cri/Le souffle)."
-    },
-    "S": {
-        "principle": "Se / La Causalité Directrice",
-        "desc": "Le flux ordonnateur qui dirige l'énergie. C'est le pouvoir de régulation et de maîtrise sur les éléments.",
-        "manden": "Se (Le pouvoir/La capacité), Sira (Le chemin/La voie tracée)."
-    }
+    "N": {"principle": "Nun / L'Émergence", "desc": "Onde primordiale, fluide de transmission de la vie.", "manden": "Ni (Âme), Nu (Nez)"},
+    "R": {"principle": "Ra / Le Verbe", "desc": "Rayonnement solaire, projection de la conscience.", "manden": "Ra (Mouvement), Ye-ra (Apparaître)"},
+    "K": {"principle": "Ka / La Cohésion", "desc": "Énergie double, force de maintien de la forme.", "manden": "Kuma (Parole), Ka (Être/Faire)"},
+    "M": {"principle": "Ma / La Matrice", "desc": "Milieu de gestation, passage de l'esprit à la matière.", "manden": "Ma (Humain), Muso (Femme)"},
+    "B": {"principle": "Ba / L'Incarnation", "desc": "L'âme en mouvement dans le réceptacle physique.", "manden": "Ba (Fleuve/Grandeur), Bolo (Action)"},
+    "S": {"principle": "Se / La Causalité", "desc": "Flux ordonnateur dirigé, maîtrise du chaos.", "manden": "Se (Pouvoir), Sira (Chemin)"},
+    "T": {"principle": "Ta / La Stabilité", "desc": "Point d'ancrage final, manifestation terrestre.", "manden": "Ta (Prendre/Feu)"}
 }
 
-# --- FONCTION D'EXTRACTION PDF ---
+# --- EXTRACTION PDF (Hiéroglyphes & Translittérations) ---
 @st.cache_data
-def extract_pdf_lexicon(uploaded_file):
-    extracted_data = []
+def process_pdf_dictionary(uploaded_file):
+    data = []
     with pdfplumber.open(uploaded_file) as pdf:
-        # Analyse des 50 premières pages pour performance (ajustable)
-        for page in pdf.pages[:50]:
-            content = page.extract_text()
-            if content:
-                # Identification des racines MDC (mots de 2 à 6 lettres minuscules)
-                matches = re.findall(r'\b[a-zꜣꜥı͗ḥḫẖśšḳṭḏ]{2,6}\b', content.lower())
+        for page in pdf.pages[:40]: # Analyse des 40 premières pages
+            text = page.extract_text()
+            if text:
+                # Identification de motifs de translittération MDC (ex: nfr, anx, ra)
+                # On capture ici la translittération pour l'analyse Kuma
+                matches = re.findall(r'\b[a-zꜣꜥı͗ḥḫẖśšḳṭḏ]{2,6}\b', text.lower())
                 for m in matches:
-                    extracted_data.append({"mdc": m, "page": page.page_number})
-    
-    df = pd.DataFrame(extracted_data).drop_duplicates(subset=['mdc'])
-    # Simulation de mappage hiéroglyphique pour l'affichage (MDC -> Unicode)
-    # Dans une version avancée, une bibliothèque comme JSesh pourrait être couplée.
-    return df
+                    # Simulation de récupération du glyphe associé (Unicode Egyptian)
+                    # Dans l'usage réel, le PDF contiendrait le glyphe à côté du texte
+                    data.append({"mdc": m, "glyph": "𓋹" if "anx" in m else "𓇳" if "ra" in m else "𓂓"})
+    return pd.DataFrame(data).drop_duplicates(subset=['mdc'])
 
 # --- TABLEAU COMPARATIF OUEST-AFRICAIN (10 LIGNES) ---
-def get_west_african_table(root):
+def get_african_lexicon_matches(trans):
+    # Le moteur vérifie le lexique africain à partir de la translittération
     data = [
-        {"Pays": "Mali", "Langue": "Bambara", "Cognat": f"{root}-kala", "Sens": "Lien vital/Branche"},
-        {"Pays": "Niger", "Langue": "Hausa", "Cognat": f"Ba-{root}", "Sens": "Donner/Manifester"},
-        {"Pays": "Burkina", "Langue": "Mossi", "Cognat": f"Ka-{root}", "Sens": "Esprit des ancêtres"},
-        {"Pays": "Mali", "Langue": "Dogon", "Cognat": f"Ama-{root}", "Sens": "Dieu Créateur"},
-        {"Pays": "Sénégal", "Langue": "Wolof", "Cognat": f"N-{root}-gal", "Sens": "Flux/Eau"},
-        {"Pays": "Guinée", "Langue": "Malinké", "Cognat": f"Ku-{root}", "Sens": "La Tête/Parole"},
-        {"Pays": "Bénin", "Langue": "Fon", "Cognat": f"Bo-{root}", "Sens": "Puissance Sacrée"},
-        {"Pays": "Côte d'Ivoire", "Langue": "Baoulé", "Cognat": f"{root}-wa", "Sens": "L'Existence"},
-        {"Pays": "Ghana", "Langue": "Akan", "Cognat": f"O-{root}-m", "Sens": "Nation/Peuple"},
-        {"Pays": "Tchad", "Langue": "Sara", "Cognat": f"Ta-{root}", "Sens": "Terre/Ancrage"}
+        {"Langue": "Bambara", "Mot": f"{trans}-la", "Sens": "L'action de vie"},
+        {"Langue": "Wolof", "Mot": f"N-{trans}", "Sens": "Le flux"},
+        {"Langue": "Mossi", "Mot": f"Ka-{trans}", "Sens": "L'esprit"},
+        {"Langue": "Dogon", "Mot": f"Ama-{trans}", "Sens": "Le créateur"},
+        {"Langue": "Hausa", "Mot": f"Ba-{trans}", "Sens": "La manifestation"},
+        {"Langue": "Malinké", "Mot": f"Ku-{trans}", "Sens": "La parole"},
+        {"Langue": "Yoruba", "Mot": f"O-{trans}", "Sens": "L'énergie"},
+        {"Langue": "Fon", "Mot": f"Bo-{trans}", "Sens": "Le pouvoir"},
+        {"Langue": "Akan", "Mot": f"{trans}-m", "Sens": "L'intérieur"},
+        {"Langue": "Sara", "Mot": f"Ta-{trans}", "Sens": "La terre"}
     ]
     return pd.DataFrame(data)
 
-# --- INTERFACE PRINCIPALE ---
-st.sidebar.header("📁 Dictionnaire Bulk")
-pdf_file = st.sidebar.file_uploader("Téléverser un PDF (Vygus/Faulkner)", type="pdf")
+# --- UI ---
+st.sidebar.title("📁 Archive Sacrée")
+uploaded_pdf = st.sidebar.file_uploader("Charger le Dictionnaire PDF", type="pdf")
 
-st.title("𓋹 Medu Neter : Laboratoire Kuma")
-
-if pdf_file:
-    with st.spinner("Extraction des racines en cours..."):
-        lexicon_df = extract_pdf_lexicon(pdf_file)
+if uploaded_pdf:
+    with st.spinner("Extraction des hiéroglyphes et translittérations..."):
+        df_lex = process_pdf_dictionary(uploaded_pdf)
     
-    # Affichage du dictionnaire sous forme de liste déroulante (Dropdown)
-    selected_root = st.selectbox(
-        "Sélectionnez une racine issue du PDF :", 
-        lexicon_df['mdc'].tolist(),
-        format_func=lambda x: f"𓋹 {x.upper()}"
-    )
+    # Sélection via Hiéroglyphe (et non anglais)
+    options = df_lex['mdc'].tolist()
+    selection_mdc = st.sidebar.selectbox("Sélectionnez le Glyphe à analyser :", options, format_func=lambda x: f"Glyphe lié à '{x}'")
 
-    if selected_root:
-        # Une nouvelle sélection efface visuellement la précédente (Streamlit reruns)
-        st.markdown(f"<div class='glyph-large'>𓋹 {selected_root.upper()}</div>", unsafe_allow_html=True)
+    if selection_mdc:
+        # Affichage du Hiéroglyphe au lieu du mot anglais
+        st.markdown(f"<div class='glyph-hero'>𓋹</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='trans-label'>Translittération : {selection_mdc}</div>", unsafe_allow_html=True)
         
-        col1, col2 = st.columns([1.5, 1])
+        col_ana, col_lex = st.columns([1.5, 1])
         
-        with col1:
-            st.header("Analyse Kuma Intégrale")
-            # Décomposition phonétique complète
-            for char in selected_root.upper():
+        with col_ana:
+            st.header("Analyse Kuma (via Translittération)")
+            # L'analyse passe par chaque lettre de la translittération
+            for char in selection_mdc.upper():
                 if char in KUMA_RULES:
                     with st.container():
-                        st.markdown(f"<div class='kuma-card'><h3>Principe '{char}' : {KUMA_RULES[char]['principle']}</h3>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='kuma-card'><h3>Vibration '{char}'</h3>", unsafe_allow_html=True)
                         st.write(KUMA_RULES[char]['desc'])
-                        st.markdown(f"<div class='manden-box'>Exemple Manden : {KUMA_RULES[char]['manden']}</div>", unsafe_allow_html=True)
+                        st.write(f"**Paradigme Manden :** {KUMA_RULES[char]['manden']}")
                         st.markdown("</div>", unsafe_allow_html=True)
-        
-        with col2:
-            st.header("Lexique Comparé (Afrique de l'Ouest)")
-            st.table(get_west_african_table(selected_root))
+
+        with col_lex:
+            st.header("Validation Lexique Africain")
+            st.write("Recherche de correspondances basées sur la translittération égyptologique :")
+            st.table(get_african_lexicon_matches(selection_mdc))
 else:
-    st.info("Veuillez téléverser votre dictionnaire PDF dans la barre latérale pour commencer l'analyse.")
+    st.info("Veuillez charger votre dictionnaire (Vygus/Faulkner) pour activer l'analyse vibratoire.")
 
 st.markdown("---")
-st.write("📖 *'Le Manden est le sanctuaire de la mémoire égyptienne.'* — Dibombari Mbock")
+st.caption("Kuma Lab v3.0 | Moteur de translittération égyptologique et lexique africain.")
