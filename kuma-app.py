@@ -1,91 +1,66 @@
 import streamlit as st
-import PyPDF2
+import pdfplumber
 import re
 
-# 1. Fallback / Default Data
+# Internal Fallback
 default_kuma = {
-    "𓇇 (Reed)": {
-        "biological_nature": "Vibrating aquatic plant",
-        "kuma_symbolism": "Movement of the soul.",
-        "african_link": "Kôm (Bassa)"
-    }
+    "𓇇 (Reed)": {"nature": "Vibrating plant", "logic": "Breath of life", "link": "Kôm"}
 }
 
-st.set_page_config(page_title="Kuma PDF Scholar", page_icon="𓂀", layout="wide")
+st.set_page_config(page_title="Kuma PDF Scholar v2", page_icon="𓂀", layout="wide")
+st.title("𓂀 Kuma Method: Advanced PDF Decoder")
 
-st.title("𓂀 Kuma Method: PDF Intelligence")
-st.markdown("Upload a PDF document containing your research on Ethiopian letters.")
-
-# 2. Sidebar: PDF Upload
+# Sidebar
 st.sidebar.header("📁 Source Document")
-uploaded_pdf = st.sidebar.file_uploader("Upload Kuma Research (PDF)", type=["pdf"])
+uploaded_pdf = st.sidebar.file_uploader("Upload PDF Research", type=["pdf"])
+debug_mode = st.sidebar.checkbox("Enable Debug (Show Raw Text)")
 
 kuma_data = {}
 
 if uploaded_pdf is not None:
-    try:
-        # Extract Text from PDF
-        pdf_reader = PyPDF2.PdfReader(uploaded_pdf)
+    with pdfplumber.open(uploaded_pdf) as pdf:
         full_text = ""
-        for page in pdf_reader.pages:
-            full_text += page.extract_text() + "\n"
+        for page in pdf.pages:
+            # pdfplumber is much better at keeping words together
+            page_text = page.extract_text()
+            if page_text:
+                full_text += page_text + "\n"
         
-        # 3. Logic: Extracting Hieroglyphic Data
-        # This regex looks for a Hieroglyph character followed by a description
-        # It assumes a format like: 𓃀 Description...
-        # Hieroglyph unicode range is roughly \u13000-\u1342F
-        glyphs_found = re.findall(r'([\u13000-\u1342F])\s*(.*?)(?=[\u13000-\u1342F]|$)', full_text, re.DOTALL)
-        
-        if glyphs_found:
-            for glyph, content in glyphs_found:
-                # Clean up the extracted text
-                clean_content = content.strip().split('\n')
-                kuma_data[f"{glyph} (Extracted)"] = {
-                    "biological_nature": clean_content[0] if len(clean_content) > 0 else "N/A",
-                    "kuma_symbolism": " ".join(clean_content[1:3]) if len(clean_content) > 1 else "Extracted from text",
-                    "african_link": clean_content[-1] if len(clean_content) > 2 else "See PDF"
-                }
-            st.sidebar.success(f"Extracted {len(kuma_data)} signs from PDF!")
-        else:
-            st.sidebar.warning("No hieroglyphs detected. Ensure the PDF contains Unicode hieroglyphs.")
-            kuma_data = default_kuma
+        if debug_mode:
+            with st.expander("🔍 Raw Text Found in PDF"):
+                st.text(full_text)
 
-    except Exception as e:
-        st.sidebar.error(f"Error processing PDF: {e}")
-        kuma_data = default_kuma
+        # Improved Regex: Finds a Hieroglyph followed by lines of text
+        # Looks for Unicode range U+13000 to U+1342F
+        pattern = r'([\u13000-\u1342F])\s*(.*?)(?=[\u13000-\u1342F]|$)'
+        matches = re.findall(pattern, full_text, re.DOTALL)
+
+        if matches:
+            for glyph, content in matches:
+                lines = [l.strip() for l in content.strip().split('\n') if l.strip()]
+                kuma_data[f"{glyph} (Extracted)"] = {
+                    "nature": lines[0] if len(lines) > 0 else "N/A",
+                    "logic": lines[1] if len(lines) > 1 else "Extracted from PDF context.",
+                    "link": lines[2] if len(lines) > 2 else "Check original document."
+                }
+            st.sidebar.success(f"Parsed {len(kuma_data)} Kuma entries!")
+        else:
+            st.sidebar.error("No Hieroglyph characters detected. Is this a scanned image?")
 else:
     kuma_data = default_kuma
 
-# 4. Main Interface
+# Main View
 if kuma_data:
-    all_keys = list(kuma_data.keys())
-    selected_key = st.sidebar.selectbox("Analyze Extracted Sign:", all_keys)
+    selected_key = st.sidebar.selectbox("Analyze Sign:", list(kuma_data.keys()))
+    entry = kuma_data[selected_key]
+    glyph = selected_key.split()[0]
 
     col1, col2 = st.columns([1, 2])
-
     with col1:
-        glyph = selected_key.split()[0]
-        st.markdown(
-            f"""
-            <div style="background-color: #262730; border-radius: 15px; padding: 30px; text-align: center; border: 2px solid #FFD700;">
-                <h1 style="font-size: 150px; color: #FFD700; margin: 0;">{glyph}</h1>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-
+        st.markdown(f"""<div style="background:#1e1e1e; padding:40px; border-radius:15px; text-align:center;">
+                    <h1 style="font-size:150px; color:#FFD700;">{glyph}</h1></div>""", unsafe_allow_html=True)
     with col2:
         st.header("Metaphysical Decipherment")
-        entry = kuma_data[selected_key]
-        
-        st.subheader("Biological Signature")
-        st.info(entry['biological_nature'])
-        
-        st.subheader("Symbolic Logic")
-        st.write(entry['kuma_symbolism'])
-        
-        st.subheader("African Connection")
-        st.warning(entry['african_link'])
-
-st.divider()
-st.caption("Note: PDF extraction works best if the hieroglyphs are actual text characters, not images.")
+        st.info(f"**Biological Nature:** {entry['nature']}")
+        st.success(f"**Symbolic Logic:** {entry['logic']}")
+        st.warning(f"**African Context:** {entry['link']}")
